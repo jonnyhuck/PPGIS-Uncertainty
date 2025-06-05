@@ -1,5 +1,8 @@
 """ 
-Anonymous version for review 
+This is a semi-automated extraction of topics from the free text data associated with the. This is used to 
+    determine the level of dependence in the dataset.
+
+@author
 """
 from re import sub
 from numpy import nan

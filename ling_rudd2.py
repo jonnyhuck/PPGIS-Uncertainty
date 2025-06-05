@@ -1,5 +1,11 @@
 """
-Anonymous version for review
+This is my extension of Ling and Rudd's (1989) combination method for implementing Dempster-Shafer theory
+    in PPGIS (and other uncertain / non-independent datasets)
+
+Import this as a library to use it yourself, or run it as a standalone script to reproduce the example given 
+    in the method of the paper.
+
+@author jonnyhuck
 """
 from copy import deepcopy
 from collections import defaultdict
@@ -277,31 +283,35 @@ if __name__ == "__main__":
     Example configuration.
     This setup is the setup used for the example in the paper - it results in:
 
-        Stage 1: Decomposition into simple support functions and overlapping & disjoint evidence
-        disjoint = 0.3306, shared = 0.5519
-        disjoint = 0.2929, shared = 0.2929
-        disjoint = 0.2254, shared = 0.2254
+    Stage 1: Decomposition into simple support functions and overlapping & disjoint evidence
+    disjoint = 0.3306, shared = 0.5519
+    disjoint = 0.2929, shared = 0.2929
+    disjoint = 0.2254, shared = 0.2254
 
-        Stage 2: Reconciling disagreement in overlapping evidence
-        m'({'trees'}) = 0.2600
-        m'({'no trees'}) = 0.0811
+    Stage 2: Reconciling disagreement in overlapping evidence
+    m'({'trees'}) = 0.2600
+    m'({'no trees'}) = 0.0811
 
-        Stage 3: Weighting expert opinion
-        m({'trees'}) = 0.2314
-        m({'no trees', 'trees'}) = 0.7686
-        m({'trees'}) = 0.2636
-        m({'no trees', 'trees'}) = 0.7364
-        m({'no trees'}) = 0.2029
-        m({'no trees', 'trees'}) = 0.7971
+    Stage 3: Weighting expert opinion
+    m({'trees'}) = 0.2314
+    m({'trees', 'no trees'}) = 0.7686
+    m({'trees'}) = 0.2636
+    m({'trees', 'no trees'}) = 0.7364
+    m({'no trees'}) = 0.2029
+    m({'trees', 'no trees'}) = 0.7971
 
-        Stage 4: Combination:
-        m({'trees'}) = 0.5096
-        m({'no trees'}) = 0.1424
-        m({'no trees', 'trees'}) = 0.3481
+    Stage 4: Combination:
+    m({'trees'}) = 0.5096
+    m({'no trees'}) = 0.1424
+    m({'trees', 'no trees'}) = 0.3481
 
-        Belief and Plausibility
-        Bel(frozenset({'trees'}))=0.5096        Pl(frozenset({'trees'}))=0.8576
-        Bel(frozenset({'no trees'}))=0.1424     Pl(frozenset({'no trees'}))=0.4904
+    Belief, Plausibility and Probability
+    Bel(frozenset({'trees'}))=0.5096        Pl(frozenset({'trees'}))=0.8576
+    Bel(frozenset({'no trees'}))=0.1424     Pl(frozenset({'no trees'}))=0.4904
+
+    Probabilities
+    P(frozenset({'trees'}))=0.7077
+    P(frozenset({'no trees'}))=0.2923
     '''
     out = lr_combination(participants = [
         Participant({frozenset(["trees"]): 0.7 }, 0.7, set(['biodiversity', 'flooding', 'climate change'])),

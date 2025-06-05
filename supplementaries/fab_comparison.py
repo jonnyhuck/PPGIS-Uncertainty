@@ -1,31 +1,28 @@
 """ 
-This is the main script used to implement my extension of Ling and Rudd's (1989) combination method 
-    to a Map-Me dataset relating to tree planting in the Lake District. This outputs a raster dataset 
-    containing six bands:
-        1. Belief Trees
-        2. Belief No Trees
-        3. Plausibility Trees
-        4. Plausibility No Trees
-        5. Probability Trees
-        6. Probability No Trees
-
-These bands are used to draw Figures 4, 5 & 6 in the manuscript.
+This produces a version of the main analysis that uses a Focal Area Bias correction rather than a weighting function. 
+See: https://www.tandfonline.com/doi/full/10.1080/13658816.2024.2440048 for more details
 
 @author jonnyhuck
 """
-from math import ceil
+from math import ceil, pi
 from sys import float_info
 from pandas import read_csv
 from scipy.spatial import cKDTree
 from rasterio import open as rio_open
 from rasterio.transform import from_origin
-from numpy import zeros, meshgrid, arange, sqrt, where
 from geopandas import GeoDataFrame, points_from_xy, read_file
+from numpy import zeros, meshgrid, arange, sqrt, where, ceil as np_ceil
 from ling_rudd2 import Participant, lr_combination, compute_belief, compute_plausibility
 
 def idw(d, r):
     """ Calculate IDW Weighting """
     return 1 - d / r
+
+def fab(distances, r):
+    """
+    Calculate the FAB weight for a circular point buffer
+    """
+    return [ r / d for d in distances ]
 
 def get_topics(topics_list):
     """ Convert a Series of comma-separated topics into a set of unique topics """
@@ -44,8 +41,8 @@ RADIUS = 150            # neighbourhood radius
 RESOLUTION = 25         # dataset resolution
 
 # load blob and answer data from Map-Me
-blobs = read_csv('./data/blobs.csv')
-answers = read_csv('./data/answers_with_terms.csv')[['id_person', 'id_subquestion', 'spray_number', 'certainty', 'terms']] # calculated using topics.py
+blobs = read_csv('../data/blobs.csv')
+answers = read_csv('../data/answers_with_terms.csv')[['id_person', 'id_subquestion', 'spray_number', 'certainty', 'terms']] # calculated using topics.py
 
 # filter blobs and answers to relevant question 
 blobs = blobs[blobs.id_question.isin([21395, 21396])]
@@ -111,7 +108,11 @@ for idx, (r, c) in enumerate(zip(*divmod(arange(len(grid_points)), grid_x.shape[
 
     # calculate IDW weights (and enforce Cromwell's rule)
     distances = sqrt((grid_points[idx][0] - dots.geometry.x)**2 + (grid_points[idx][1] - dots.geometry.y)**2)
-    dots['gw'] = idw(distances, RADIUS)
+    
+    # get FAB-corrected weights, limited to a distance of 1px
+    # dots['gw'] = fab(distances, RADIUS)                                           # raw FAB Values
+    dots['gw'] = fab(np_ceil(distances/RESOLUTION), RADIUS)                         # ceil pixel FAB values
+    # dots['gw'] = fab(where(distances<RESOLUTION, RESOLUTION, distances), RADIUS)    # min distance enforced as RESOLUTION
     dots['gw'] = where(dots['gw'] == 1, 1-float_info.epsilon, dots['gw'])
     dots['gw'] = where((dots['gw'] == 0), float_info.epsilon, dots['gw'])
 
@@ -211,7 +212,7 @@ if PREVIEW:
 
 if OUTPUT:
     # write scores to raster
-    with rio_open(f'output_ling_rudd_sources.tif', 'w', driver='GTiff',
+    with rio_open(f'../sensitivity/fab_ceil.tif', 'w', driver='GTiff',
                 height=scores.shape[1], width=scores.shape[2], count=scores.shape[0],
                 dtype=scores.dtype, crs='EPSG:27700', transform=affine) as dataset:
         for i in range(scores.shape[0]):

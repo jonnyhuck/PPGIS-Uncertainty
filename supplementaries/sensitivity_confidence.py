@@ -1,17 +1,5 @@
 """ 
-This is the main script used to implement my extension of Ling and Rudd's (1989) combination method 
-    to a Map-Me dataset relating to tree planting in the Lake District. This outputs a raster dataset 
-    containing six bands:
-        1. Belief Trees
-        2. Belief No Trees
-        3. Plausibility Trees
-        4. Plausibility No Trees
-        5. Probability Trees
-        6. Probability No Trees
-
-These bands are used to draw Figures 4, 5 & 6 in the manuscript.
-
-@author jonnyhuck
+This version is for a sensitivity analysis of the effect of excluding confidence
 """
 from math import ceil
 from sys import float_info
@@ -21,7 +9,7 @@ from rasterio import open as rio_open
 from rasterio.transform import from_origin
 from numpy import zeros, meshgrid, arange, sqrt, where
 from geopandas import GeoDataFrame, points_from_xy, read_file
-from ling_rudd2 import Participant, lr_combination, compute_belief, compute_plausibility
+from ling_rudd2 import Participant, lr_combination, compute_plausibility
 
 def idw(d, r):
     """ Calculate IDW Weighting """
@@ -38,7 +26,7 @@ def get_topics_string(topics_list):
 
 
 ''' SETTINGS '''
-PREVIEW = True          # do you want to preview the results?
+PREVIEW = False         # do you want to preview the results?
 OUTPUT = True           # do you want to write the results to GeoTiff?
 RADIUS = 150            # neighbourhood radius
 RESOLUTION = 25         # dataset resolution
@@ -61,9 +49,8 @@ blobs = blobs.merge(answers, how='left', on=['id_person', 'spray_number', 'id_qu
 # convert to geodataframe
 gdf = GeoDataFrame(blobs, geometry=points_from_xy(blobs['lng'], blobs['lat']), crs='EPSG:4326').to_crs('EPSG:27700').cx[331000:336500, 505700:509100]
 
-# enforce Cromwell's rule
-gdf['certainty'] = where(gdf['certainty'] == 1, 1-float_info.epsilon, gdf['certainty'])
-gdf['certainty'] = where((gdf['certainty'] == 0), float_info.epsilon, gdf['certainty'])
+# make everyone certain
+gdf['certainty'] = [1]*len(gdf.index)
 
 # drop data inside the lakes
 lakes = read_file('data/lakes.shp')
@@ -72,9 +59,6 @@ gdf = gdf[~gdf.geometry.within(lakes.union_all())]
 # get total participant count (and m value if required)
 total_participants = len(gdf['id_person'].unique())
 print(f"participant count: {total_participants}")
-
-# rescale certainty
-gdf['certainty'] /= 10
 
 # get bounds for output raster
 bounds = gdf.total_bounds
@@ -162,8 +146,8 @@ for idx, (r, c) in enumerate(zip(*divmod(arange(len(grid_points)), grid_x.shape[
     m = lr_combination(participants)
 
     # update cells with belief & plausibility
-    scores[0, r, c] = compute_belief(m, frozenset({'trees'}))
-    scores[1, r, c] = compute_belief(m, frozenset({'no trees'}))
+    scores[0, r, c] = m[frozenset({'trees'})]
+    scores[1, r, c] = m[frozenset({'no trees'})]
     scores[2, r, c] = compute_plausibility(m, frozenset({'trees'}))
     scores[3, r, c] = compute_plausibility(m, frozenset({'no trees'}))
 
@@ -211,7 +195,7 @@ if PREVIEW:
 
 if OUTPUT:
     # write scores to raster
-    with rio_open(f'output_ling_rudd_sources.tif', 'w', driver='GTiff',
+    with rio_open(f'../sensitivity/without_certainty.tif', 'w', driver='GTiff',
                 height=scores.shape[1], width=scores.shape[2], count=scores.shape[0],
                 dtype=scores.dtype, crs='EPSG:27700', transform=affine) as dataset:
         for i in range(scores.shape[0]):
